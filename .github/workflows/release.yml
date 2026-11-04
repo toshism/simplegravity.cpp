@@ -1,0 +1,113 @@
+name: Build & Release
+
+on:
+  push:
+    tags: ["v*"]       # runs when you push a tag like v1.0.0
+  workflow_dispatch:   # also lets you trigger it manually from the Actions tab
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+          - os: windows-latest
+          - os: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ---------- install raylib per operating system ----------
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update && sudo apt-get install -y g++ make pkg-config
+          # Official prebuilt raylib (ships libraylib.a; apt's package is
+          # dynamic-only and usually an older version)
+          curl -sL -o /tmp/raylib.tar.gz https://github.com/raysan5/raylib/releases/download/6.2/raylib-6.2_linux_amd64.tar.gz
+          sudo mkdir -p /opt/raylib
+          sudo tar xzf /tmp/raylib.tar.gz -C /opt/raylib --strip-components=1
+          # Register it with pkg-config so the Makefile finds it
+          printf 'prefix=/opt/raylib\nlibdir=${prefix}/lib\nincludedir=${prefix}/include\n\nName: raylib\nDescription: raylib (official prebuilt)\nVersion: 6.2\nLibs: -L${libdir} -lraylib\nLibs.private: -l:libGL.so.1 -l:libX11.so.6 -lm -ldl\nCflags: -I${includedir}\n' | sudo tee /usr/lib/pkgconfig/raylib.pc > /dev/null
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-make
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-raylib
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install raylib pkg-config
+
+      # ---------- build ----------
+      - name: Build (Linux / macOS)
+        if: runner.os != 'Windows'
+        run: make
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          mingw32-make
+          mkdir -p staging
+          cp simplegravity.exe staging/
+          # Ship the runtime DLLs too, so the zip also runs on machines
+          # without MSYS2 even if some library was linked dynamically
+          # (harmless duplicates if everything was linked statically).
+          cp -f /ucrt64/bin/glfw3.dll /ucrt64/bin/raylib.dll staging/ || true
+
+      # ---------- package the binary ----------
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path staging/* -DestinationPath dist/simplegravity-windows-x64.zip
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p dist
+          tar czf dist/simplegravity-linux-x64.tar.gz simplegravity
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p dist
+          zip -j dist/simplegravity-macos-arm64.zip simplegravity
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: simplegravity-${{ runner.os }}
+          path: dist/*
+
+  release:
+    name: Attach binaries to GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed so the action can create the release
+    steps:
+      - name: Download all built packages
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: dist
+
+      - name: Create release and upload binaries
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

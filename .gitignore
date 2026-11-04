@@ -1,0 +1,22 @@
+# Build outputs
+simplegravity
+simplegravity.exe
+*.o
+*.obj
+*.out
+dist/
+
+# Visual Studio (your current dev setup)
+.vs/
+*.user
+*.suo
+x64/
+Debug/
+Release/
+
+# VS Code
+.vscode/
+
+# OS junk
+.DS_Store
+Thumbs.db
