@@ -1,26 +1,5 @@
 # ------------------------------------------------------------------
 # simplegravity.cpp - Makefile  [kit v4]
-#
-#   v4: removed the "prefer static libglfw3.a" branch - MSYS2's
-#       libraylib.a references glfw through __imp_ import thunks, so
-#       glfw must link via its import library (glfw3.dll). The
-#       Release zip ships glfw3.dll next to the exe; libstdc++ and
-#       libgcc stay statically linked.
-#   v3: recipe lines use real Tab characters again (v2 shipped
-#       spaces, which made make fail with "missing separator").
-#   v2: Windows static link adds -lwinmm (fixes
-#       "undefined reference to __imp_timeBeginPeriod").
-#
-#   make        build the executable
-#   make run    build and run it
-#   make clean  delete the built executable
-#
-# Needs raylib installed (pkg-config is used to find its flags).
-# raygui.h is header-only and lives next to this file.
-#
-# NOTE: the indented command lines below MUST start with a real
-# Tab character, not spaces. If you copy-paste and make says
-# "missing separator", fix the indentation to tabs.
 # ------------------------------------------------------------------
 
 CXX      ?= g++
