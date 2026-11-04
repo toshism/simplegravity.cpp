@@ -11,6 +11,12 @@
 using namespace std;
 const int ScreenWidth = 1920;
 const int ScreenHeight = 1080;
+Vector2 sim2screen(float cx, float cy, float factor) {
+    return Vector2{ (cx/factor), (cy/factor) };
+}
+Vector2 screen2sim(float cx, float cy, float factor) {
+    return Vector2{ (cx * factor), (cy * factor) };
+}
 class gravitySource {
 public:
     int radius;
@@ -26,6 +32,9 @@ public:
         xv(xv), yv(yv),
         mass(mass) {
     }
+    Vector2 giveScreenCoords(float factor) {
+        return sim2screen(cx, cy, factor);
+    }
 };
 
 class gravityPlain {
@@ -35,6 +44,10 @@ public:
         Objects.emplace_back(radius, cx, cy, xv, yv, mass);
     }
     float gravitationalConstant = 1000.0f;
+    int margins;
+    int trailWidth=500;
+    float factor = 5.0;
+    float maxFactor = 5.0;
     float distanceBetweenCenters(float cx1, float cy1, float cx2, float cy2) {
         float dx = cx2 - cx1;
         float dy = cy2 - cy1;
@@ -83,23 +96,26 @@ public:
             Objects[i].cy += Objects[i].yv * deltatime;
         }
         for (int i = (int)Objects.size() - 1; i >= 0; i--) {
-            if (Objects[i].cx + Objects[i].radius < 0 ||
-                Objects[i].cx - Objects[i].radius > ScreenWidth ||
-                Objects[i].cy + Objects[i].radius < 0 ||
-                Objects[i].cy - Objects[i].radius > ScreenHeight) {
+            if (Objects[i].cx + Objects[i].radius < 0 - margins ||
+                Objects[i].cx - Objects[i].radius > (ScreenWidth + margins)*maxFactor ||
+                Objects[i].cy + Objects[i].radius < 0 - margins||
+                Objects[i].cy - Objects[i].radius > (ScreenHeight + margins)*maxFactor) {
                 Objects.erase(Objects.begin() + i);
             }
         }
     }
     void draw() {
         for (int i = 0; i < Objects.size(); i++) {
-            int brightness = clamp((int)(Objects[i].mass / 5000.0f * 255.0f),30, 255);
-            Color baseColor = { brightness, brightness, brightness, 255};
-            DrawCircle((int)Objects[i].cx, (int)Objects[i].cy, Objects[i].radius, baseColor);
+            int brightness = clamp((int)(Objects[i].mass / 10000.0f * 255.0f),30, 255);
+            Color baseColor = { brightness, brightness, brightness, 200};
+            Vector2 displayCoords = Objects[i].giveScreenCoords(factor);
+            DrawCircleV(displayCoords, Objects[i].radius/factor, baseColor);
             if (Objects[i].trail.size() >= 2) {
                 for (int j = 0; j < Objects[i].trail.size() - 1; j++) {
-                    DrawLineV(Objects[i].trail[j], Objects[i].trail[j + 1], WHITE);
-                    if (Objects[i].trail.size() > 500) {
+                    Vector2 displayLine1 = sim2screen(Objects[i].trail[j].x, Objects[i].trail[j].y, factor);
+                    Vector2 displayLine2 = sim2screen(Objects[i].trail[j+1].x, Objects[i].trail[j+1].y, factor);
+                    DrawLineV(displayLine1,displayLine2, WHITE);
+                    if (Objects[i].trail.size() > trailWidth) {
                         Objects[i].trail.erase(Objects[i].trail.begin());
                     }
                 }
@@ -108,22 +124,30 @@ public:
     }
 };
 int main() {
-    InitWindow(ScreenWidth, ScreenHeight, "Gravity sim");
+    InitWindow(1920, 1080, "Gravity sim");
     SetTargetFPS(60);
     gravityPlain world;
-    // Play around, this is just a simple somewhat stable configuration
-    world.addObject(30, 900, 540, 0, 0, 1300);
-    world.addObject(12, 1100, 540, 0, 75, 100);
-    float volume = 50.0f;
+    world.margins = 200;
+    world.trailWidth = 500;
+    world.factor = 5.0;
+    world.addObject(60, 1000, 1000, 100, 10, 1000);
+    float clickMass = 50.0f;
+    float clickRadius = 20;
     while (!WindowShouldClose()) {
         float deltaTime = GetFrameTime();
         world.update(deltaTime);
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionRecs(Rectangle(GetMouseX(),GetMouseY(), 1, 1), { 60, 60, 200, 20 })) {
-            world.addObject(20, GetMouseX(), GetMouseY(), 0, 0, volume);
+        Vector2 mousePos = screen2sim((float)GetMouseX(),(float)GetMouseY(), world.factor);
+        Rectangle massSliderArea = { 60, 50, 400, 10 };
+        Rectangle radiusSliderArea = { 60, 80, 200, 10 };
+        Rectangle zoomSliderArea = { 60, 110, 200, 10 };
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !CheckCollisionPointRec(Vector2{ (float)GetMouseX(),(float)GetMouseY()}, massSliderArea) && !CheckCollisionPointRec(Vector2{ (float)GetMouseX(),(float)GetMouseY() }, radiusSliderArea) && !CheckCollisionPointRec(Vector2{ (float)GetMouseX(),(float)GetMouseY() }, zoomSliderArea)) {
+            world.addObject(clickRadius, mousePos.x, mousePos.y, 0, 0, clickMass);
         }
         BeginDrawing();
         ClearBackground(BLACK);
-        GuiSlider(Rectangle{ 60, 60, 200, 20 }, "100 Mass", "5000 Mass",&volume, 100.0, 5000.0);
+        GuiSlider(massSliderArea, "50 Mass", "10000 Mass",&clickMass, 50.0, 10000.0);
+        GuiSlider(radiusSliderArea, "10 Radius", "250 Radius", &clickRadius, 10.0, 250.0);
+        GuiSlider(zoomSliderArea, "5x zoom", "1x zoom", &world.factor, 1.0, 5.0);
         world.draw();
         EndDrawing();
     }
