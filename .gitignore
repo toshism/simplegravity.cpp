@@ -5,6 +5,7 @@ simplegravity.exe
 *.obj
 *.out
 dist/
+.web-deps/
 
 # Visual Studio (your current dev setup)
 .vs/

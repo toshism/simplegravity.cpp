@@ -71,3 +71,19 @@ run: $(TARGET)
 
 clean:
 	rm -f $(TARGET)
+
+# ------------------------------------------------------------------
+# Web (WebAssembly) build - see "Web browser" in README-build-section.md
+#   make web     builds dist/web/ with Emscripten (fetches pinned raylib/emsdk)
+#   make serve   serves it on http://127.0.0.1:$(PORT)/  (Ctrl+C stops)
+# ------------------------------------------------------------------
+PORT ?= 8080
+
+.PHONY: web serve
+
+web:
+	./build-web.sh
+
+serve:
+	@test -f dist/web/index.wasm || { echo "dist/web/index.wasm missing: run 'make web' first" >&2; exit 1; }
+	python3 -m http.server $(PORT) --bind 127.0.0.1 --directory dist/web

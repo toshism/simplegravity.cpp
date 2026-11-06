@@ -7,6 +7,9 @@
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 #include <algorithm>
+#if defined(PLATFORM_WEB)
+#include <emscripten/emscripten.h>
+#endif
 
 using namespace std;
 const int ScreenWidth = 1920;
@@ -123,17 +126,13 @@ public:
         }
     }
 };
-int main() {
-    InitWindow(1920, 1080, "Gravity sim");
-    SetTargetFPS(60);
-    gravityPlain world;
-    world.margins = 200;
-    world.trailWidth = 500;
-    world.factor = 5.0;
-    world.addObject(60, 1000, 1000, 100, 10, 1000);
-    float clickMass = 50.0f;
-    float clickRadius = 20;
-    while (!WindowShouldClose()) {
+// Web port: the loop body lives in UpdateDrawFrame() so the browser can drive
+// it once per animation frame (raylib wiki "Working for Web", option 4.1).
+// The state it uses moved from main() to file scope; values are unchanged.
+gravityPlain world;
+float clickMass = 50.0f;
+float clickRadius = 20;
+void UpdateDrawFrame() {
         float deltaTime = GetFrameTime();
         world.update(deltaTime);
         Vector2 mousePos = screen2sim((float)GetMouseX(),(float)GetMouseY(), world.factor);
@@ -150,7 +149,22 @@ int main() {
         GuiSlider(zoomSliderArea, "5x zoom", "1x zoom", &world.factor, 1.0, 5.0);
         world.draw();
         EndDrawing();
+}
+int main() {
+    InitWindow(1920, 1080, "Gravity sim");
+    world.margins = 200;
+    world.trailWidth = 500;
+    world.factor = 5.0;
+    world.addObject(60, 1000, 1000, 100, 10, 1000);
+#if defined(PLATFORM_WEB)
+    // requestAnimationFrame pacing; SetTargetFPS would block inside EndDrawing.
+    emscripten_set_main_loop(UpdateDrawFrame, 0, 1);
+#else
+    SetTargetFPS(60);
+    while (!WindowShouldClose()) {
+        UpdateDrawFrame();
     }
+#endif
 
     CloseWindow();
     return 0;

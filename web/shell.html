@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<!-- Based on raylib 6.2 src/minshell.html; external FileSaver/favicon/meta tags
+     removed so the bundle runs fully offline. Errors are shown on the page. -->
+<head>
+    <meta charset="utf-8">
+    <title>Gravity sim</title>
+    <link rel="icon" href="data:,">
+    <style>
+        body { margin: 0px; background-color: black; color: #ddd; font: 14px sans-serif; }
+        canvas.emscripten { border: 0px none; background-color: black; display: block; }
+        #status { position: fixed; left: 8px; bottom: 8px; white-space: pre-wrap; }
+        #status.error { color: #ff7070; }
+    </style>
+</head>
+<body>
+    <canvas class=emscripten id=canvas oncontextmenu=event.preventDefault() tabindex=-1></canvas>
+    <div id="status">Loading…</div>
+    <script>
+        var statusEl = document.getElementById('status');
+        function showError(text) {
+            statusEl.className = 'error';
+            statusEl.textContent = 'Error: ' + text;
+        }
+        window.addEventListener('error', function (e) { showError(e.message); });
+        var Module = {
+            print: function (text) { console.log(text); },
+            printErr: function (text) { console.warn(text); },
+            canvas: document.getElementById('canvas'),
+            onRuntimeInitialized: function () { statusEl.textContent = ''; },
+            onAbort: function (what) { showError(String(what)); }
+        };
+    </script>
+    {{{ SCRIPT }}}
+</body>
+</html>
